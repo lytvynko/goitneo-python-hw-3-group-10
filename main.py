@@ -9,6 +9,7 @@ class Field:
     def __str__(self):
         return str(self.value)
 
+
 class Name(Field):
     # реалізація класу
     def __init__(self, value):
@@ -17,24 +18,32 @@ class Name(Field):
         else:
             raise ValueError("Name is required")
 
+
 class Phone(Field):
     # реалізація класу
     def __init__(self, value):
         if Phone.is_valid_phone_number(value):
             super().__init__(value)
+            
     def is_valid_phone_number(phone_number):
         # Перевірка чи номер телефону має 10 цифр
         return phone_number.isdigit() and len(phone_number) == 10
 
+
 class Birthday(Field):
-    def __init__(self, birthday = ''):
-        self.birthday = birthday
+    date_format = "%d.%m.%Y"
+    def __init__(self, value):
+        self.value = datetime.strptime(value, self.date_format).date()
+    
+    def __str__(self):
+        return self.value.strftime(self.date_format)
+
 
 class Record:
-    def __init__(self, name, birthday=''):
+    def __init__(self, name, phone=None, birthday=None):
         self.name = Name(name)
-        self.phones = []
-        self.birthday = Birthday(birthday)
+        self.phones = [] if not phone else [Phone(phone)]
+        self.birthday = birthday if not birthday else Birthday(birthday)
 
     # реалізація класу
     def add_phone(self, phone_number):
@@ -64,26 +73,27 @@ class Record:
     def add_birthday(self, birthday):
         # Метод для додавання дня народження
         self.birthday = Birthday(birthday)
+        return f"Birthday add to contact {self.name}"
 
     def show_birthday(self):
         # Метод для виводу дня народження
         return f"Birthday for {self.name.value}: {self.birthday.birthday}" if self.birthday else "Don't know the birthday."
 
-     
-
-
     def __str__(self):
-        return f"Contact name: {self.name.value}, phones: {'; '.join(p.value for p in self.phones)}"
+        bd_str = str(self.birthday) if self.birthday else "not set"
+        phones_str = "; ".join(str(p) for p in self.phones) if self.phones else "not set"
+        return f"Contact name: {self.name.value}, phones: {phones_str}, birthday: {bd_str}"
+
 
 class AddressBook(UserDict):
-    def add_birthday(self, name, birthday):
-        # Метод для додавання дня народження до існуючого контакту
-        contact = self.data.get(name)
-        if contact:
-            contact.add_birthday(birthday)
-        else:
-            print(f"Contact {name} not found.")
-    # реалізація класу
+    # def add_birthday(self, name, birthday):
+    #     # Метод для додавання дня народження до існуючого контакту
+    #     contact = self.data.get(name)
+    #     if contact:
+    #         contact.add_birthday(birthday)
+    #     else:
+    #         print(f"Contact {name} not found.")
+    # # реалізація класу
     def add_record(self, record):
         # Метод для додавання запису до адресної книги
         self.data[record.name.value] = record
@@ -100,14 +110,16 @@ class AddressBook(UserDict):
         if name in self.data:
             del self.data[name]
 
-    def get_birthdays_per_week(users):
+    def get_birthdays_per_week(self):
         birthdays_week = defaultdict(list)
         current_date = datetime.today().date()
         
-        for user in users:
-            name = user["name"]
-            birthday = user["birthday"].date()
-            birthday_this_year = birthday.replace(year=current_date.year)
+        for rec in self.data.values():
+            name = str(rec.name)
+            birthday = rec.birthday
+            if not birthday:
+                continue
+            birthday_this_year = birthday.value.replace(year=current_date.year)
             days_difference = (birthday_this_year - current_date).days
             day_of_week = (current_date + timedelta(days=days_difference)).strftime("%A")
             
@@ -115,7 +127,13 @@ class AddressBook(UserDict):
                 birthdays_week[day_of_week].append(name)
 
         for day, names in birthdays_week.items():
-            print(f"This week don't forget to wish your collegues a happy birthday. On {day}: {', '.join(names)}")
+            return f"This week don't forget to wish your collegues a happy birthday. On {day}: {', '.join(names)}"
+    
+    def __str__(self) -> str:
+        if not self.data:
+            return "No records yet"
+        return "\n".join(str(r) for r in self.data.values())
+    
 
 def input_error(func):
     def inner(*args, **kwargs):
@@ -130,16 +148,25 @@ def input_error(func):
 
     return inner
 
+
 def parse_input(user_input):
     cmd, *args = user_input.split()
     cmd = cmd.strip().lower()
     return cmd, *args
 
+
 @input_error
 def add_contact(args, contacts):
-    name, phone = args
-    contacts[name] = phone
-    return "Contact added."
+    name = args[0]
+    phone = args[1]
+    rec = contacts.get(name)
+    if rec:
+        rec.add_phone(phone)
+        return f"Phone {phone} added to contact {name}"
+    contacts.add_record(Record(name, phone=phone))
+    
+    return f"Contact {name} added with phone {phone}"
+
 
 @input_error
 def change_username_phone(args, contacts):
@@ -150,6 +177,7 @@ def change_username_phone(args, contacts):
     else:
         return f"Contact {name} does not exist."
 
+
 @input_error
 def get_username_phone(args, contacts):
     name = args[0]
@@ -158,16 +186,28 @@ def get_username_phone(args, contacts):
     else:
         return f"Contact {name} does not exist."
 
+
+@input_error
+def add_birthday(args, contacts):
+    name = args[0]
+    birthday_str = args[1]
+    rec = contacts.get(name)
+    if rec:
+        return rec.add_birthday(birthday_str)
+    contacts.add_record(Record(name, birthday=birthday_str))
+    return f"Contact {name} added with birthday {birthday_str}"
+
+
 @input_error
 def show_all_contacts(contacts):
-    if contacts:
-        contact = ''
-        for name, phone in contacts.items():
-            contact += f"{name}: {phone}\n"
-        return contact
-    else:
-        return "No contacts found."
-
+    return str(contacts)
+    # if contacts:
+    #     contact = ''
+    #     for name, phone in contacts.items():
+    #         contact += f"{name}: {phone}\n"
+    #     return contact
+    # else:
+    #     return "No contacts found."
 
 
 def main():
@@ -176,6 +216,8 @@ def main():
     while True:
         user_input = input("Enter a command: ")
         command, *args = parse_input(user_input)
+        
+        result = ""
 
         if command in ["close", "exit"]:
             print("Good bye!")
@@ -183,32 +225,30 @@ def main():
         elif command == "hello":
             print("How can I help you?")
         elif command == "add":
-            print(add_contact(args, contacts))
+            result = add_contact(args, contacts)
         elif command == "change":
-            print(change_username_phone(args, contacts))
+            result = change_username_phone(args, contacts)
         elif command == "phone":
-            print(get_username_phone(args, contacts))
+            result = get_username_phone(args, contacts)
         elif command == "all":
-            print(show_all_contacts(contacts))  
+            result = show_all_contacts(contacts)
         elif command == "add-birthday":
-            if len(args) < 2:
-                print("Usage: add-birthday <contact_name> <birthday>")
-            else:
-                contact_name = args[0]
-                birthday = args[1]
-                contacts.add_birthday(contact_name, birthday)
-                print(f"Birthday added for {contact_name}.")
+            result = add_birthday(args, contacts)
+            # if len(args) < 2:
+            #     print("Usage: add-birthday <contact_name> <birthday>")
+            # else:
+            #     contact_name = args[0]
+            #     birthday = args[1]
+            #     contacts.add_birthday(contact_name, birthday)
+            #     print(f"Birthday added for {contact_name}.")
         elif command == "show-birthday":
-            contact = contacts.find(args[0])
-            if contact:
-                birthday_info = contact.show_birthday()
-                print(birthday_info)
-            else:
-                print(f"Contact {args[0]} not found.")
+            result = contacts.get_birthdays_per_week()
         elif command == "birthdays":
             contacts.get_birthdays_per_week()
         else:
-            print("Invalid command.")
+            result = "Invalid command."
+        print(result)
+
 
 if __name__ == "__main__":
     main()
