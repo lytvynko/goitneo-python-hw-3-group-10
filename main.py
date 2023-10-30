@@ -73,11 +73,16 @@ class Record:
     def add_birthday(self, birthday):
         # Метод для додавання дня народження
         self.birthday = Birthday(birthday)
-        return f"Birthday add to contact {self.name}"
+        return f"Birthday added to contact {self.name}"
 
-    def show_birthday(self):
+    def show_birthday(args, contacts):
         # Метод для виводу дня народження
-        return f"Birthday for {self.name.value}: {self.birthday.birthday}" if self.birthday else "Don't know the birthday."
+        name = args[0]
+        contact = contacts.find(name)
+        if contact:
+            return f"Birthday forrrrrr {contact.name.value}: {contact.birthday}" if contact.birthday else "Don't know the birthday."
+        else:
+            return f"Contact {name} does not exist."
 
     def __str__(self):
         bd_str = str(self.birthday) if self.birthday else "not set"
@@ -197,6 +202,36 @@ def add_birthday(args, contacts):
     contacts.add_record(Record(name, birthday=birthday_str))
     return f"Contact {name} added with birthday {birthday_str}"
 
+@input_error
+def show_birthday(args, contacts):
+    name = args[0]
+    contact = contacts.find(name)
+    if contact:
+        return f"Birthday for {contact.name.value}: {contact.birthday}" if contact.birthday else "Don't know the birthday."
+    else:
+        return f"Contact {name} does not exist."
+
+
+@input_error
+def birthdays(contacts):
+    birthdays_week = defaultdict(list)
+    current_date = datetime.today().date()
+    
+    for rec in contacts.data.values():
+        name = str(rec.name)
+        birthday = rec.birthday
+        if not birthday:
+            continue
+        birthday_this_year = birthday.value.replace(year=current_date.year)
+        days_difference = (birthday_this_year - current_date).days
+        day_of_week = (current_date + timedelta(days=days_difference)).strftime("%A")
+        
+        if days_difference >= 0 and days_difference < 7:
+            birthdays_week[day_of_week].append(name)
+
+    for day, names in birthdays_week.items():
+        return f"This week don't forget to wish your collegues a happy birthday. On {day}: {', '.join(names)}"
+         
 
 @input_error
 def show_all_contacts(contacts):
@@ -242,9 +277,13 @@ def main():
             #     contacts.add_birthday(contact_name, birthday)
             #     print(f"Birthday added for {contact_name}.")
         elif command == "show-birthday":
-            result = contacts.get_birthdays_per_week()
+            result = show_birthday(args, contacts)
+            print(result)
+        
+
+
         elif command == "birthdays":
-            contacts.get_birthdays_per_week()
+            result = birthdays(contacts)
         else:
             result = "Invalid command."
         print(result)
